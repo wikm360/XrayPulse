@@ -7,15 +7,8 @@
 pip install -r requirements.txt
 ```
 
-### requirements.txt
-```
-flet>=0.25.0
-requests>=2.31.0
-```
-
 ### Additional Files Needed
-1. Copy `convert.py` from your existing project to the monitor directory
-2. Ensure you have Xray binary installed in:
+Ensure you have Xray binary installed in:
    - Windows: `./core/win/xray.exe`
    - Linux: `./core/linux/xray`
    - macOS: `./core/macos/xray`
@@ -24,8 +17,8 @@ requests>=2.31.0
 
 ### 1. Clone or Create Project Structure
 ```bash
-mkdir xray-monitor
-cd xray-monitor
+mkdir XrayPulse
+cd XrayPulse
 ```
 
 ### 2. Copy Required Files
@@ -33,17 +26,12 @@ cd xray-monitor
 # Copy the three main files
 - monitor.py (main application)
 - web_interface.py (web dashboard)
-- convert.py (from your existing project)
-```
-
-### 3. Install Dependencies
-```bash
-pip install flet requests
+- convert.py (link to json parser)
 ```
 
 ### 4. Create Directory Structure
 ```
-xray-monitor/
+XrayPulse/
 ├── monitor.py           # Main monitoring application
 ├── web_interface.py      # Web interface
 ├── convert.py           # Config converter (from existing project)
@@ -73,7 +61,7 @@ python monitor.py
    - Configs will be fetched and converted automatically
 
 3. **Access the web dashboard:**
-   - Open browser: `http://127.0.0.1:8080`
+   - Open browser: `http://127.0.0.1:7070`
    - Dashboard updates automatically every 10 seconds
 
 ### Features
@@ -108,7 +96,7 @@ In `monitor.py`, modify the web server port:
 ```python
 self.web_server = multiprocessing.Process(
     target=run_web_server,
-    args=("127.0.0.1", 8080),  # Change 8080 to desired port
+    args=("127.0.0.1", 7070),  # Change 7070 to desired port
     daemon=True
 )
 ```
