@@ -1,7 +1,6 @@
-#!/usr/bin/env python3
 """
 Web Interface for Xray Config Monitor
-Modern and beautiful dashboard using Flet
+Mobile-First Responsive Design
 """
 
 import flet as ft
@@ -13,60 +12,234 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 import asyncio
+from web_config_const import *
 
 class MonitorDashboard:
-    """Modern monitoring dashboard using Flet"""
+    """Mobile-responsive monitoring dashboard using Flet"""
     
     def __init__(self, page: ft.Page):
         self.page = page
-        self.results_file = Path("./ping_results.json")
+        self.results_file = Path(PATHS.get("results_file", "./ping_results.json"))
         self.config_cards = {}
         self.update_timer = None
+        self.is_mobile = False
         self.setup_page()
+        self.detect_screen_size()
         self.create_ui()
         
     def setup_page(self):
         """Configure page settings"""
-        self.page.title = "Xray Config Monitor"
+        self.page.title = TEXT.get("app_title", "Xray Monitor")
         self.page.theme_mode = ft.ThemeMode.DARK
         self.page.padding = 0
-        self.page.window.width = 1400
-        self.page.window.height = 900
-        self.page.window.min_width = 1200
-        self.page.window.min_height = 700
         
-        # Modern color scheme
+        # Remove fixed window size for mobile responsiveness
+        self.page.window.width = None
+        self.page.window.height = None
+        
+        # Modern color scheme from config
         self.page.theme = ft.Theme(
             color_scheme=ft.ColorScheme(
-                primary=ft.Colors.BLUE_400,
-                primary_container=ft.Colors.BLUE_900,
-                secondary=ft.Colors.CYAN_400,
-                background=ft.Colors.GREY_900,
-                surface=ft.Colors.GREY_800,
-                on_primary=ft.Colors.WHITE,
-                on_secondary=ft.Colors.WHITE,
-                on_background=ft.Colors.WHITE,
-                on_surface=ft.Colors.WHITE,
+                primary=getattr(ft.Colors, DARK_THEME["primary"]),
+                primary_container=getattr(ft.Colors, DARK_THEME["primary_container"]),
+                secondary=getattr(ft.Colors, DARK_THEME["secondary"]),
+                background=getattr(ft.Colors, DARK_THEME["background"]),
+                surface=getattr(ft.Colors, DARK_THEME["surface"]),
+                on_primary=getattr(ft.Colors, DARK_THEME["on_primary"]),
+                on_secondary=getattr(ft.Colors, DARK_THEME["on_secondary"]),
+                on_background=getattr(ft.Colors, DARK_THEME["on_background"]),
+                on_surface=getattr(ft.Colors, DARK_THEME["on_surface"]),
             )
         )
+        
+        # Add resize handler
+        self.page.on_resize = self.on_page_resize
+    
+    def detect_screen_size(self):
+        """Detect if we're on mobile based on screen width"""
+        if self.page.width and self.page.width < MOBILE_BREAKPOINT:
+            self.is_mobile = True
+        else:
+            self.is_mobile = False
+    
+    def get_delay_category(self, delay: float, status: str) -> Dict:
+        """Get category info based on delay and status"""
+        if status != "online":
+            return DELAY_CATEGORIES["OFFLINE"]
+        
+        if delay < DELAY_CATEGORIES["EXCELLENT"]["max_delay"]:
+            return DELAY_CATEGORIES["EXCELLENT"]
+        elif delay < DELAY_CATEGORIES["GOOD"]["max_delay"]:
+            return DELAY_CATEGORIES["GOOD"]
+        elif delay < DELAY_CATEGORIES["FAIR"]["max_delay"]:
+            return DELAY_CATEGORIES["FAIR"]
+        else:
+            return DELAY_CATEGORIES["POOR"]
+    
+    def on_page_resize(self, e):
+        """Handle page resize events"""
+        old_is_mobile = self.is_mobile
+        self.detect_screen_size()
+        
+        # Rebuild UI if switching between mobile/desktop
+        if old_is_mobile != self.is_mobile:
+            self.page.controls.clear()
+            self.create_ui()
+            self.load_results()
     
     def create_ui(self):
-        """Create the main user interface"""
+        """Create responsive UI based on screen size"""
+        if self.is_mobile:
+            self.create_mobile_ui()
+        else:
+            self.create_desktop_ui()
+    
+    def create_mobile_ui(self):
+        """Create mobile-optimized UI"""
         
-        # Header with gradient background
+        # Compact header for mobile
+        self.header = ft.Container(
+            content=ft.Column([
+                ft.Row([
+                    ft.Icon(ft.Icons.MONITOR_HEART, size=24, color=ft.Colors.CYAN_400),
+                    ft.Text(
+                        TEXT["app_title"],
+                        size=20,
+                        weight=ft.FontWeight.BOLD,
+                        color=ft.Colors.WHITE
+                    ),
+                    ft.Container(expand=True),
+                    ft.IconButton(
+                        icon=ft.Icons.DARK_MODE if self.page.theme_mode == ft.ThemeMode.LIGHT else ft.Icons.LIGHT_MODE,
+                        icon_size=20,
+                        on_click=self.toggle_theme,
+                        tooltip=TEXT["theme_tooltip"],
+                        icon_color=ft.Colors.WHITE,
+                    ),
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                ft.Text(
+                    TEXT["app_subtitle_mobile"],
+                    size=12,
+                    color=ft.Colors.GREY_400
+                ),
+            ], spacing=5),
+            padding=ft.padding.all(MOBILE_CONFIG["header_padding"]),
+            gradient=ft.LinearGradient(
+                begin=ft.alignment.top_left,
+                end=ft.alignment.bottom_right,
+                colors=[
+                    getattr(ft.Colors, HEADER_GRADIENT["start_color"]),
+                    getattr(ft.Colors, HEADER_GRADIENT["end_color"])
+                ],
+            ),
+        )
+        
+        # Horizontal scrollable stats for mobile
+        self.stats_row = ft.Row(
+            [
+                self.create_mobile_stat_card(
+                    STAT_CARDS["total"]["title_mobile"], "0",
+                    getattr(ft.Icons, STAT_CARDS["total"]["icon"]),
+                    getattr(ft.Colors, STAT_CARDS["total"]["color"])
+                ),
+                self.create_mobile_stat_card(
+                    STAT_CARDS["online"]["title_mobile"], "0",
+                    getattr(ft.Icons, STAT_CARDS["online"]["icon"]),
+                    getattr(ft.Colors, STAT_CARDS["online"]["color"])
+                ),
+                self.create_mobile_stat_card(
+                    STAT_CARDS["offline"]["title_mobile"], "0",
+                    getattr(ft.Icons, STAT_CARDS["offline"]["icon"]),
+                    getattr(ft.Colors, STAT_CARDS["offline"]["color"])
+                ),
+                self.create_mobile_stat_card(
+                    STAT_CARDS["average"]["title_mobile"], "0ms",
+                    getattr(ft.Icons, STAT_CARDS["average"]["icon"]),
+                    getattr(ft.Colors, STAT_CARDS["average"]["color"])
+                ),
+            ],
+            scroll=ft.ScrollMode.HIDDEN,
+            spacing=MOBILE_CONFIG["card_spacing"],
+        )
+        
+        # Search bar for mobile
+        self.search_field = ft.TextField(
+            label=TEXT["search_placeholder_mobile"],
+            prefix_icon=ft.Icons.SEARCH,
+            border_radius=10,
+            filled=True,
+            fill_color=ft.Colors.GREY_800,
+            dense=True,
+            height=MOBILE_CONFIG["search_height"],
+            expand=True,
+            on_change=self.filter_configs,
+        )
+        
+        # Sort dropdown for mobile
+        self.sort_dropdown = ft.Dropdown(
+            options=[
+                ft.dropdown.Option(opt["value"], opt["label"])
+                for opt in SORT_OPTIONS["mobile"]
+            ],
+            value="delay",
+            width=MOBILE_CONFIG["dropdown_width"],
+            dense=True,
+            # height=MOBILE_CONFIG["search_height"],
+            filled=True,
+            fill_color=ft.Colors.GREY_800,
+            border_radius=10,
+            on_change=self.sort_configs,
+        )
+        
+        # Configs list for mobile (single column)
+        self.configs_container = ft.Column(
+            scroll=ft.ScrollMode.ADAPTIVE,
+            spacing=10,
+            expand=True,
+        )
+        
+        # Main mobile layout
+        self.main_content = ft.Column([
+            self.header,
+            ft.Container(
+                content=self.stats_row,
+                padding=ft.padding.all(10),
+            ),
+            ft.Container(
+                content=ft.Row([
+                    self.search_field,
+                    self.sort_dropdown,
+                ], spacing=10),
+                padding=ft.padding.symmetric(horizontal=10, vertical=5),
+            ),
+            ft.Container(
+                content=self.configs_container,
+                padding=ft.padding.all(10),
+                expand=True,
+            ),
+        ], spacing=0, expand=True)
+        
+        self.page.add(self.main_content)
+        self.start_auto_refresh()
+        self.load_results()
+    
+    def create_desktop_ui(self):
+        """Create desktop UI (original design)"""
+        
+        # Desktop header
         self.header = ft.Container(
             content=ft.Row([
                 ft.Row([
                     ft.Icon(ft.Icons.MONITOR_HEART, size=40, color=ft.Colors.CYAN_400),
                     ft.Column([
                         ft.Text(
-                            "Xray Config Monitor",
+                            TEXT["app_title_full"],
                             size=28,
                             weight=ft.FontWeight.BOLD,
                             color=ft.Colors.WHITE
                         ),
                         ft.Text(
-                            "Real-time Configuration Performance Monitoring",
+                            TEXT["app_subtitle"],
                             size=14,
                             color=ft.Colors.GREY_400
                         ),
@@ -74,18 +247,11 @@ class MonitorDashboard:
                 ], spacing=20),
                 ft.Row([
                     self.create_status_indicator(),
-                    # ft.IconButton(
-                    #     icon=ft.Icons.REFRESH,
-                    #     icon_size=24,
-                    #     on_click=self.manual_refresh,
-                    #     tooltip="Refresh Now",
-                    #     icon_color=ft.Colors.WHITE,
-                    # ),
                     ft.IconButton(
                         icon=ft.Icons.DARK_MODE if self.page.theme_mode == ft.ThemeMode.LIGHT else ft.Icons.LIGHT_MODE,
                         icon_size=24,
                         on_click=self.toggle_theme,
-                        tooltip="Toggle Theme",
+                        tooltip=TEXT["theme_tooltip"],
                         icon_color=ft.Colors.WHITE,
                     ),
                 ], spacing=10),
@@ -94,25 +260,44 @@ class MonitorDashboard:
             gradient=ft.LinearGradient(
                 begin=ft.alignment.top_left,
                 end=ft.alignment.bottom_right,
-                colors=[ft.Colors.BLUE_900, ft.Colors.PURPLE_900],
+                colors=[
+                    getattr(ft.Colors, HEADER_GRADIENT["start_color"]),
+                    getattr(ft.Colors, HEADER_GRADIENT["end_color"])
+                ],
             ),
         )
         
-        # Statistics cards
+        # Desktop stats
         self.stats_row = ft.Row(
             [
-                self.create_stat_card("Total Configs", "0", ft.Icons.DNS, ft.Colors.BLUE_400),
-                self.create_stat_card("Online", "0", ft.Icons.CHECK_CIRCLE, ft.Colors.GREEN_400),
-                self.create_stat_card("Offline", "0", ft.Icons.ERROR, ft.Colors.RED_400),
-                self.create_stat_card("Avg Delay", "0ms", ft.Icons.SPEED, ft.Colors.ORANGE_400),
+                self.create_stat_card(
+                    STAT_CARDS["total"]["title"], "0",
+                    getattr(ft.Icons, STAT_CARDS["total"]["icon"]),
+                    getattr(ft.Colors, STAT_CARDS["total"]["color"])
+                ),
+                self.create_stat_card(
+                    STAT_CARDS["online"]["title"], "0",
+                    getattr(ft.Icons, STAT_CARDS["online"]["icon"]),
+                    getattr(ft.Colors, STAT_CARDS["online"]["color"])
+                ),
+                self.create_stat_card(
+                    STAT_CARDS["offline"]["title"], "0",
+                    getattr(ft.Icons, STAT_CARDS["offline"]["icon"]),
+                    getattr(ft.Colors, STAT_CARDS["offline"]["color"])
+                ),
+                self.create_stat_card(
+                    STAT_CARDS["average"]["title"], "0ms",
+                    getattr(ft.Icons, STAT_CARDS["average"]["icon"]),
+                    getattr(ft.Colors, STAT_CARDS["average"]["color"])
+                ),
             ],
             alignment=ft.MainAxisAlignment.SPACE_AROUND,
             spacing=20,
         )
         
-        # Search and filter bar
+        # Desktop search and filter
         self.search_field = ft.TextField(
-            label="Search configurations...",
+            label=TEXT["search_placeholder"],
             prefix_icon=ft.Icons.SEARCH,
             border_radius=10,
             filled=True,
@@ -123,10 +308,8 @@ class MonitorDashboard:
         
         self.sort_dropdown = ft.Dropdown(
             options=[
-                ft.dropdown.Option("name", "Name"),
-                ft.dropdown.Option("delay", "Delay (Low to High)"),
-                ft.dropdown.Option("delay_desc", "Delay (High to Low)"),
-                ft.dropdown.Option("status", "Status"),
+                ft.dropdown.Option(opt["value"], opt["label"])
+                for opt in SORT_OPTIONS["desktop"]
             ],
             value="delay",
             width=200,
@@ -144,18 +327,18 @@ class MonitorDashboard:
             padding=ft.padding.symmetric(horizontal=30, vertical=10),
         )
         
-        # Config cards container
+        # Desktop grid view
         self.configs_grid = ft.GridView(
             expand=True,
-            runs_count=4,
-            max_extent=350,
-            child_aspect_ratio=1.2,
-            spacing=20,
-            run_spacing=20,
-            padding=ft.padding.all(30),
+            runs_count=DESKTOP_GRID["columns"],
+            max_extent=DESKTOP_GRID["max_card_width"],
+            child_aspect_ratio=DESKTOP_GRID["card_aspect_ratio"],
+            spacing=DESKTOP_GRID["spacing"],
+            run_spacing=DESKTOP_GRID["spacing"],
+            padding=ft.padding.all(DESKTOP_GRID["padding"]),
         )
         
-        # Main layout
+        # Desktop layout
         self.main_content = ft.Column([
             self.header,
             ft.Container(
@@ -166,14 +349,116 @@ class MonitorDashboard:
             self.configs_grid,
         ], spacing=0, expand=True)
         
-        # Add to page
         self.page.add(self.main_content)
-        
-        # Start auto-refresh
         self.start_auto_refresh()
-        
-        # Initial load
         self.load_results()
+    
+    def create_mobile_stat_card(self, title: str, value: str, icon, color) -> ft.Container:
+        """Create compact statistics card for mobile"""
+        return ft.Container(
+            content=ft.Column([
+                ft.Icon(icon, size=20, color=color),
+                ft.Text(
+                    value,
+                    size=18,
+                    weight=ft.FontWeight.BOLD,
+                    color=ft.Colors.WHITE,
+                ),
+                ft.Text(
+                    title,
+                    size=11,
+                    color=ft.Colors.GREY_400,
+                ),
+            ], spacing=2, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+            padding=ft.padding.all(10),
+            border_radius=10,
+            width=MOBILE_CONFIG["stat_card_width"],
+            bgcolor=ft.Colors.GREY_800,
+            gradient=ft.LinearGradient(
+                begin=ft.alignment.top_left,
+                end=ft.alignment.bottom_right,
+                colors=[
+                    ft.Colors.with_opacity(0.05, color),
+                    ft.Colors.with_opacity(0.02, color),
+                ],
+            ),
+            border=ft.border.all(1, ft.Colors.with_opacity(0.2, color)),
+        )
+    
+    def create_mobile_config_card(self, name: str, data: Dict) -> ft.Container:
+        """Create mobile-optimized config card"""
+        delay = data.get("delay", 9999)
+        status = data.get("status", "unknown")
+        timestamp = data.get("timestamp", "")
+        
+        # Get category info from config
+        category = self.get_delay_category(delay, status)
+        border_color = getattr(ft.Colors, category["color"])
+        status_color = border_color
+        quality = category["quality_text"]
+        
+        # Format timestamp
+        try:
+            dt = datetime.fromisoformat(timestamp)
+            time_str = dt.strftime("%H:%M")
+        except:
+            time_str = "N/A"
+        
+        # Truncate name based on config
+        max_length = ADVANCED["max_config_name_length_mobile"]
+        display_name = name[:max_length] + "..." if len(name) > max_length else name
+        
+        return ft.Container(
+            content=ft.Row([
+                # Status indicator
+                ft.Container(
+                    width=4,
+                    height=60,
+                    bgcolor=status_color,
+                    border_radius=ft.border_radius.only(top_left=10, bottom_left=10),
+                ),
+                # Main content
+                ft.Container(
+                    content=ft.Column([
+                        ft.Text(
+                            display_name,
+                            size=14,
+                            weight=ft.FontWeight.W_500,
+                            color=ft.Colors.WHITE,
+                        ),
+                        ft.Row([
+                            ft.Container(
+                                content=ft.Text(
+                                    quality,
+                                    size=11,
+                                    color=ft.Colors.WHITE,
+                                ),
+                                padding=ft.padding.symmetric(horizontal=8, vertical=2),
+                                bgcolor=status_color,
+                                border_radius=10,
+                            ),
+                            ft.Text(
+                                f"{delay:.0f}ms" if delay < ADVANCED["offline_delay_threshold"] else "N/A",
+                                size=12,
+                                weight=ft.FontWeight.BOLD,
+                                color=status_color,
+                            ),
+                            ft.Text(
+                                time_str,
+                                size=11,
+                                color=ft.Colors.GREY_400,
+                            ),
+                        ], spacing=10),
+                    ], spacing=5),
+                    expand=True,
+                    padding=ft.padding.all(10),
+                ),
+            ], spacing=0),
+            bgcolor=ft.Colors.GREY_800,
+            border_radius=10,
+            border=ft.border.all(1, ft.Colors.with_opacity(0.3, border_color)),
+            margin=ft.margin.symmetric(horizontal=5),
+        )
     
     def create_status_indicator(self) -> ft.Container:
         """Create a status indicator widget"""
@@ -194,7 +479,7 @@ class MonitorDashboard:
         )
     
     def create_stat_card(self, title: str, value: str, icon: str, color: str) -> ft.Container:
-        """Create a statistics card"""
+        """Create desktop statistics card"""
         return ft.Container(
             content=ft.Column([
                 ft.Row([
@@ -224,46 +509,36 @@ class MonitorDashboard:
         )
     
     def create_config_card(self, name: str, data: Dict) -> ft.Container:
-        """Create a configuration card"""
+        """Create desktop configuration card"""
         delay = data.get("delay", 9999)
         status = data.get("status", "unknown")
         timestamp = data.get("timestamp", "")
         
-        # Determine card appearance based on status
-        if status == "online":
-            if delay < 100:
-                border_color = ft.Colors.GREEN_400
-                status_icon = ft.Icons.SIGNAL_CELLULAR_ALT
-                status_color = ft.Colors.GREEN_400
-                quality = "Excellent"
-            elif delay < 300:
-                border_color = ft.Colors.BLUE_400
-                status_icon = ft.Icons.SIGNAL_CELLULAR_ALT_2_BAR
-                status_color = ft.Colors.BLUE_400
-                quality = "Good"
-            elif delay < 500:
-                border_color = ft.Colors.ORANGE_400
-                status_icon = ft.Icons.SIGNAL_CELLULAR_ALT_1_BAR
-                status_color = ft.Colors.ORANGE_400
-                quality = "Fair"
-            else:
-                border_color = ft.Colors.YELLOW_700
-                status_icon = ft.Icons.SIGNAL_CELLULAR_0_BAR
-                status_color = ft.Colors.YELLOW_700
-                quality = "Poor"
-        else:
-            border_color = ft.Colors.RED_400
-            status_icon = ft.Icons.SIGNAL_CELLULAR_OFF
-            status_color = ft.Colors.RED_400
-            quality = "Offline"
+        category = self.get_delay_category(delay, status)
+        border_color = getattr(ft.Colors, category["color"])
+        status_color = border_color
+        quality = category["quality_text"]
         
+        # تعیین آیکون بر اساس وضعیت و کیفیت
+        if status != "online":
+            status_icon = ft.Icons.SIGNAL_CELLULAR_OFF
+        else:
+            if delay < 100:
+                status_icon = ft.Icons.SIGNAL_CELLULAR_ALT
+            elif delay < 300:
+                status_icon = ft.Icons.SIGNAL_CELLULAR_ALT_2_BAR
+            elif delay < 500:
+                status_icon = ft.Icons.SIGNAL_CELLULAR_ALT_1_BAR
+            else:
+                status_icon = ft.Icons.SIGNAL_CELLULAR_0_BAR
+
         # Format timestamp
         try:
             dt = datetime.fromisoformat(timestamp)
             time_str = dt.strftime("%H:%M:%S")
         except:
             time_str = "N/A"
-        
+
         card = ft.Container(
             content=ft.Column([
                 # Header
@@ -293,7 +568,7 @@ class MonitorDashboard:
                         ft.Icon(ft.Icons.SPEED, size=16, color=ft.Colors.GREY_400),
                         ft.Text("Delay:", size=14, color=ft.Colors.GREY_400),
                         ft.Text(
-                            f"{delay:.0f}ms" if delay < 9999 else "N/A",
+                            f"{delay:.0f}ms" if delay < ADVANCED["offline_delay_threshold"] else "N/A",
                             size=14,
                             weight=ft.FontWeight.BOLD,
                             color=ft.Colors.WHITE,
@@ -329,14 +604,15 @@ class MonitorDashboard:
         return card
     
     def on_card_hover(self, e):
-        """Handle card hover effect"""
-        if e.data == "true":
-            e.control.elevation = 10
-            e.control.scale = 1.02
-        else:
-            e.control.elevation = 0
-            e.control.scale = 1.0
-        self.page.update()
+        """Handle card hover effect (desktop only)"""
+        if not self.is_mobile:
+            if e.data == "true":
+                e.control.elevation = 10
+                e.control.scale = 1.02
+            else:
+                e.control.elevation = 0
+                e.control.scale = 1.0
+            self.page.update()
     
     def load_results(self):
         """Load and display results from file"""
@@ -358,17 +634,25 @@ class MonitorDashboard:
             self.update_statistics(results)
             
             # Clear and rebuild config cards
-            self.configs_grid.controls.clear()
+            if self.is_mobile:
+                self.configs_container.controls.clear()
+            else:
+                self.configs_grid.controls.clear()
             self.config_cards.clear()
             
             # Sort results
             sorted_results = self.sort_results(results, self.sort_dropdown.value)
             
-            # Create cards
+            # Create cards based on view type
             for name, config_data in sorted_results:
-                card = self.create_config_card(name, config_data)
-                self.config_cards[name] = card
-                self.configs_grid.controls.append(card)
+                if self.is_mobile:
+                    card = self.create_mobile_config_card(name, config_data)
+                    self.config_cards[name] = card
+                    self.configs_container.controls.append(card)
+                else:
+                    card = self.create_config_card(name, config_data)
+                    self.config_cards[name] = card
+                    self.configs_grid.controls.append(card)
             
             self.page.update()
             
@@ -400,11 +684,17 @@ class MonitorDashboard:
         delays = [r.get("delay", 0) for r in results.values() if r.get("status") == "online" and r.get("delay", 9999) < 9999]
         avg_delay = sum(delays) / len(delays) if delays else 0
         
-        # Update stat cards
-        self.stats_row.controls[0].content.controls[1].value = str(total)
-        self.stats_row.controls[1].content.controls[1].value = str(online)
-        self.stats_row.controls[2].content.controls[1].value = str(offline)
-        self.stats_row.controls[3].content.controls[1].value = f"{avg_delay:.0f}ms"
+        # Update stat cards based on view type
+        if self.is_mobile:
+            self.stats_row.controls[0].content.controls[1].value = str(total)
+            self.stats_row.controls[1].content.controls[1].value = str(online)
+            self.stats_row.controls[2].content.controls[1].value = str(offline)
+            self.stats_row.controls[3].content.controls[1].value = f"{avg_delay:.0f}ms"
+        else:
+            self.stats_row.controls[0].content.controls[1].value = str(total)
+            self.stats_row.controls[1].content.controls[1].value = str(online)
+            self.stats_row.controls[2].content.controls[1].value = str(offline)
+            self.stats_row.controls[3].content.controls[1].value = f"{avg_delay:.0f}ms"
     
     def filter_configs(self, e):
         """Filter configurations based on search text"""
@@ -422,117 +712,118 @@ class MonitorDashboard:
         """Sort configurations based on selected criteria"""
         self.load_results()
     
-    def manual_refresh(self, e):
-        """Manual refresh button handler"""
-        self.load_results()
-        
-        # Show refresh animation
-        e.control.rotate = ft.Rotate(2 * 3.14159, alignment=ft.alignment.center)
-        self.page.update()
-        time.sleep(0.5)
-        e.control.rotate = ft.Rotate(0, alignment=ft.alignment.center)
-        self.page.update()
-    
     def toggle_theme(self, e):
         """Toggle between light and dark theme"""
         if self.page.theme_mode == ft.ThemeMode.DARK:
             self.page.theme_mode = ft.ThemeMode.LIGHT
             e.control.icon = ft.Icons.DARK_MODE
             
-            # Update theme colors for light mode
+            # Update theme colors for light mode from config
             self.page.theme = ft.Theme(
                 color_scheme=ft.ColorScheme(
-                    primary=ft.Colors.BLUE_600,
-                    primary_container=ft.Colors.BLUE_100,
-                    secondary=ft.Colors.CYAN_600,
-                    background=ft.Colors.GREY_100,
-                    surface=ft.Colors.WHITE,
-                    on_primary=ft.Colors.WHITE,
-                    on_secondary=ft.Colors.WHITE,
-                    on_background=ft.Colors.BLACK,
-                    on_surface=ft.Colors.BLACK,
+                    primary=getattr(ft.Colors, LIGHT_THEME["primary"]),
+                    primary_container=getattr(ft.Colors, LIGHT_THEME["primary_container"]),
+                    secondary=getattr(ft.Colors, LIGHT_THEME["secondary"]),
+                    background=getattr(ft.Colors, LIGHT_THEME["background"]),
+                    surface=getattr(ft.Colors, LIGHT_THEME["surface"]),
+                    on_primary=getattr(ft.Colors, LIGHT_THEME["on_primary"]),
+                    on_secondary=getattr(ft.Colors, LIGHT_THEME["on_secondary"]),
+                    on_background=getattr(ft.Colors, LIGHT_THEME["on_background"]),
+                    on_surface=getattr(ft.Colors, LIGHT_THEME["on_surface"]),
                 )
             )
         else:
             self.page.theme_mode = ft.ThemeMode.DARK
             e.control.icon = ft.Icons.LIGHT_MODE
             
-            # Reset to dark theme
+            # Reset to dark theme from config
             self.page.theme = ft.Theme(
                 color_scheme=ft.ColorScheme(
-                    primary=ft.Colors.BLUE_400,
-                    primary_container=ft.Colors.BLUE_900,
-                    secondary=ft.Colors.CYAN_400,
-                    background=ft.Colors.GREY_900,
-                    surface=ft.Colors.GREY_800,
-                    on_primary=ft.Colors.WHITE,
-                    on_secondary=ft.Colors.WHITE,
-                    on_background=ft.Colors.WHITE,
-                    on_surface=ft.Colors.WHITE,
+                    primary=getattr(ft.Colors, DARK_THEME["primary"]),
+                    primary_container=getattr(ft.Colors, DARK_THEME["primary_container"]),
+                    secondary=getattr(ft.Colors, DARK_THEME["secondary"]),
+                    background=getattr(ft.Colors, DARK_THEME["background"]),
+                    surface=getattr(ft.Colors, DARK_THEME["surface"]),
+                    on_primary=getattr(ft.Colors, DARK_THEME["on_primary"]),
+                    on_secondary=getattr(ft.Colors, DARK_THEME["on_secondary"]),
+                    on_background=getattr(ft.Colors, DARK_THEME["on_background"]),
+                    on_surface=getattr(ft.Colors, DARK_THEME["on_surface"]),
                 )
             )
         
         self.page.update()
-        self.load_results()  # Reload to apply theme changes
+        self.page.controls.clear()
+        self.create_ui()
+        self.load_results()
     
     def show_no_data(self):
         """Show no data message"""
-        self.configs_grid.controls.clear()
-        self.configs_grid.controls.append(
-            ft.Container(
-                content=ft.Column([
-                    ft.Icon(ft.Icons.INBOX, size=64, color=ft.Colors.GREY_600),
-                    ft.Text(
-                        "No Data Available",
-                        size=24,
-                        weight=ft.FontWeight.BOLD,
-                        color=ft.Colors.GREY_600,
-                    ),
-                    ft.Text(
-                        "Waiting for test results...",
-                        size=16,
-                        color=ft.Colors.GREY_500,
-                    ),
-                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                padding=ft.padding.all(50),
-                alignment=ft.alignment.center,
-                expand=True,
-            )
+        no_data_container = ft.Container(
+            content=ft.Column([
+                ft.Icon(ft.Icons.INBOX, size=48 if self.is_mobile else 64, color=ft.Colors.GREY_600),
+                ft.Text(
+                    "No Data Available",
+                    size=20 if self.is_mobile else 24,
+                    weight=ft.FontWeight.BOLD,
+                    color=ft.Colors.GREY_600,
+                ),
+                ft.Text(
+                    "Waiting for test results...",
+                    size=14 if self.is_mobile else 16,
+                    color=ft.Colors.GREY_500,
+                ),
+            ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+            padding=ft.padding.all(30 if self.is_mobile else 50),
+            alignment=ft.alignment.center,
+            expand=True,
         )
+        
+        if self.is_mobile:
+            self.configs_container.controls.clear()
+            self.configs_container.controls.append(no_data_container)
+        else:
+            self.configs_grid.controls.clear()
+            self.configs_grid.controls.append(no_data_container)
+        
         self.page.update()
     
     def show_error(self, error_msg: str):
         """Show error message"""
-        self.configs_grid.controls.clear()
-        self.configs_grid.controls.append(
-            ft.Container(
-                content=ft.Column([
-                    ft.Icon(ft.Icons.ERROR_OUTLINE, size=64, color=ft.Colors.RED_400),
-                    ft.Text(
-                        "Error Loading Data",
-                        size=24,
-                        weight=ft.FontWeight.BOLD,
-                        color=ft.Colors.RED_400,
-                    ),
-                    ft.Text(
-                        error_msg,
-                        size=16,
-                        color=ft.Colors.GREY_500,
-                        text_align=ft.TextAlign.CENTER,
-                    ),
-                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                padding=ft.padding.all(50),
-                alignment=ft.alignment.center,
-                expand=True,
-            )
+        error_container = ft.Container(
+            content=ft.Column([
+                ft.Icon(ft.Icons.ERROR_OUTLINE, size=48 if self.is_mobile else 64, color=ft.Colors.RED_400),
+                ft.Text(
+                    "Error Loading Data",
+                    size=20 if self.is_mobile else 24,
+                    weight=ft.FontWeight.BOLD,
+                    color=ft.Colors.RED_400,
+                ),
+                ft.Text(
+                    error_msg,
+                    size=14 if self.is_mobile else 16,
+                    color=ft.Colors.GREY_500,
+                    text_align=ft.TextAlign.CENTER,
+                ),
+            ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+            padding=ft.padding.all(30 if self.is_mobile else 50),
+            alignment=ft.alignment.center,
+            expand=True,
         )
+        
+        if self.is_mobile:
+            self.configs_container.controls.clear()
+            self.configs_container.controls.append(error_container)
+        else:
+            self.configs_grid.controls.clear()
+            self.configs_grid.controls.append(error_container)
+        
         self.page.update()
     
     def start_auto_refresh(self):
         """Start automatic refresh timer"""
         def refresh_loop():
             while True:
-                time.sleep(10)  # Refresh every 10 seconds
+                time.sleep(AUTO_REFRESH_INTERVAL)  # Use config value
                 try:
                     self.load_results()
                 except Exception as e:
@@ -547,207 +838,38 @@ class MonitorDashboard:
         pass
 
 
-class AdvancedDashboard(MonitorDashboard):
-    """Extended dashboard with additional features"""
+def run_web_server(host: str = None, port: int = None):
+    """Run the Flet web server with configurable host and port"""
     
-    def __init__(self, page: ft.Page):
-        super().__init__(page)
-        self.add_advanced_features()
+    # Use config values if not provided
+    if host is None:
+        host = WEB_SERVER.get("host", "127.0.0.1")
+    if port is None:
+        port = WEB_SERVER.get("port", 8080)
     
-    def add_advanced_features(self):
-        """Add advanced monitoring features"""
+    def main(page: ft.Page):
+        # Create responsive dashboard
+        dashboard = MonitorDashboard(page)
         
-        # Add chart view toggle
-        self.view_toggle = ft.SegmentedButton(
-            selected={"grid"},
-            segments=[
-                ft.Segment(
-                    value="grid",
-                    label=ft.Text("Grid View"),
-                    icon=ft.Icon(ft.Icons.GRID_VIEW),
-                ),
-                ft.Segment(
-                    value="chart",
-                    label=ft.Text("Chart View"),
-                    icon=ft.Icon(ft.Icons.SHOW_CHART),
-                ),
-                ft.Segment(
-                    value="table",
-                    label=ft.Text("Table View"),
-                    icon=ft.Icon(ft.Icons.TABLE_CHART),
-                ),
-            ],
-            on_change=self.change_view,
-        )
+        # Handle cleanup on close
+        def on_close(e):
+            dashboard.cleanup()
         
-        # Add to filter bar
-        self.filter_bar.content.controls.append(self.view_toggle)
-        
-        # Create chart view
-        self.chart_view = self.create_chart_view()
-        
-        # Create table view
-        self.table_view = self.create_table_view()
+        page.on_window_close = on_close
     
-    def create_chart_view(self) -> ft.Container:
-        """Create chart visualization"""
-        return ft.Container(
-            content=ft.Column([
-                ft.Text(
-                    "Performance Chart",
-                    size=20,
-                    weight=ft.FontWeight.BOLD,
-                ),
-                ft.Container(
-                    content=ft.Text("Chart visualization coming soon..."),
-                    height=400,
-                    bgcolor=ft.Colors.GREY_800,
-                    border_radius=10,
-                    alignment=ft.alignment.center,
-                ),
-            ]),
-            padding=ft.padding.all(30),
-            visible=False,
-        )
-    
-    def create_table_view(self) -> ft.Container:
-        """Create table view"""
-        self.data_table = ft.DataTable(
-            columns=[
-                ft.DataColumn(ft.Text("Name", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Status", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Delay (ms)", weight=ft.FontWeight.BOLD), numeric=True),
-                ft.DataColumn(ft.Text("Quality", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Last Test", weight=ft.FontWeight.BOLD)),
-            ],
-            rows=[],
-            border=ft.border.all(1, ft.Colors.GREY_800),
-            border_radius=10,
-            vertical_lines=ft.border.BorderSide(1, ft.Colors.GREY_800),
-            horizontal_lines=ft.border.BorderSide(1, ft.Colors.GREY_800),
-            column_spacing=50,
-            heading_row_color=ft.Colors.GREY_800,
-            data_row_color={
-                ft.ControlState.HOVERED: ft.Colors.GREY_800,
-                ft.ControlState.DEFAULT: ft.Colors.TRANSPARENT,
-            },
-        )
-        
-        return ft.Container(
-            content=ft.Column([
-                self.data_table,
-            ], scroll=ft.ScrollMode.AUTO),
-            padding=ft.padding.all(30),
-            visible=False,
-            expand=True,
-        )
-    
-    def change_view(self, e):
-        """Change between different view modes"""
-        selected_view = list(e.control.selected)[0]
-        
-        # Hide all views
-        self.configs_grid.visible = False
-        self.chart_view.visible = False
-        self.table_view.visible = False
-        
-        # Show selected view
-        if selected_view == "grid":
-            self.configs_grid.visible = True
-        elif selected_view == "chart":
-            self.chart_view.visible = True
-        elif selected_view == "table":
-            self.table_view.visible = True
-            self.update_table_data()
-        
-        self.page.update()
-    
-    def update_table_data(self):
-        """Update table with current data"""
-        try:
-            if not self.results_file.exists():
-                return
-            
-            with open(self.results_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            
-            results = data.get("results", {})
-            
-            # Clear existing rows
-            self.data_table.rows.clear()
-            
-            # Add new rows
-            for name, config_data in results.items():
-                delay = config_data.get("delay", 9999)
-                status = config_data.get("status", "unknown")
-                timestamp = config_data.get("timestamp", "")
-                
-                # Determine quality
-                if status == "online":
-                    if delay < 100:
-                        quality = "Excellent"
-                        status_color = ft.Colors.GREEN_400
-                    elif delay < 300:
-                        quality = "Good"
-                        status_color = ft.Colors.BLUE_400
-                    elif delay < 500:
-                        quality = "Fair"
-                        status_color = ft.Colors.ORANGE_400
-                    else:
-                        quality = "Poor"
-                        status_color = ft.Colors.YELLOW_700
-                else:
-                    quality = "N/A"
-                    status_color = ft.Colors.RED_400
-                
-                # Format timestamp
-                try:
-                    dt = datetime.fromisoformat(timestamp)
-                    time_str = dt.strftime("%H:%M:%S")
-                except:
-                    time_str = "N/A"
-                
-                self.data_table.rows.append(
-                    ft.DataRow(
-                        cells=[
-                            ft.DataCell(ft.Text(name[:40] + "..." if len(name) > 40 else name)),
-                            ft.DataCell(
-                                ft.Container(
-                                    content=ft.Text(status.upper(), color=ft.Colors.WHITE, size=12),
-                                    bgcolor=status_color,
-                                    padding=ft.padding.symmetric(horizontal=10, vertical=5),
-                                    border_radius=5,
-                                )
-                            ),
-                            ft.DataCell(ft.Text(f"{delay:.0f}" if delay < 9999 else "N/A")),
-                            ft.DataCell(ft.Text(quality, color=status_color)),
-                            ft.DataCell(ft.Text(time_str)),
-                        ]
-                    )
-                )
-            
-        except Exception as e:
-            print(f"Error updating table: {e}")
-
-
-def main(page: ft.Page):
-    """
-    Entry point for Flet app (required for `flet run`)
-    This will be used in both web and desktop modes.
-    """
-    
-    # Initialize dashboard
-    dashboard = AdvancedDashboard(page)
-
-    # Handle cleanup when window closes
-    def on_close(e):
-        dashboard.cleanup()
-    
-    page.on_window_close = on_close
-
-    # Show UI
-    dashboard.create_layout()
+    # Run as web app
+    ft.app(
+        target=main,
+        view=ft.AppView.WEB_BROWSER,
+        assets_dir="./assets" ,
+        port=port,
+        host=host,
+    )
 
 
 if __name__ == "__main__":
+    # For testing, run as desktop app
+    def main(page: ft.Page):
+        dashboard = MonitorDashboard(page)
+    
     ft.app(target=main)
