@@ -1,5 +1,11 @@
 # XrayPulse - Xray Config Monitor
 
+## Project Screenshots
+
+![pc Page](ScreenShots/1.png)
+
+![mobile Panel](ScreenShots/2.png)
+
 ## Project Structure
 ```
 XrayPulse/
