@@ -730,7 +730,7 @@ class AdvancedDashboard(MonitorDashboard):
             print(f"Error updating table: {e}")
 
 
-def run_web_server(host: str = "127.0.0.1", port: int = 8080):
+def run_web_server(host: str = "127.0.0.1", port: int = 7070):
     """Run the Flet web server"""
     
     def main(page: ft.Page):

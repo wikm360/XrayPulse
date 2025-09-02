@@ -476,11 +476,11 @@ class MonitorController:
         
         self.web_server = multiprocessing.Process(
             target=run_web_server,
-            args=("127.0.0.1", 8080),
+            args=("127.0.0.1", 7070),
             daemon=True
         )
         self.web_server.start()
-        print(f"Web interface available at: http://127.0.0.1:8080")
+        print(f"Web interface available at: http://127.0.0.1:7070")
     
     def stop(self):
         """Stop all components"""
