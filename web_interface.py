@@ -730,31 +730,24 @@ class AdvancedDashboard(MonitorDashboard):
             print(f"Error updating table: {e}")
 
 
-def run_web_server(host: str = "127.0.0.1", port: int = 7070):
-    """Run the Flet web server"""
+def main(page: ft.Page):
+    """
+    Entry point for Flet app (required for `flet run`)
+    This will be used in both web and desktop modes.
+    """
     
-    def main(page: ft.Page):
-        # Use advanced dashboard
-        dashboard = AdvancedDashboard(page)
-        
-        # Handle cleanup on close
-        def on_close(e):
-            dashboard.cleanup()
-        
-        page.on_window_close = on_close
+    # Initialize dashboard
+    dashboard = AdvancedDashboard(page)
+
+    # Handle cleanup when window closes
+    def on_close(e):
+        dashboard.cleanup()
     
-    # Run as web app
-    ft.app(
-        target=main,
-        view=ft.AppView.WEB_BROWSER,
-        port=port,
-        host=host,
-    )
+    page.on_window_close = on_close
+
+    # Show UI
+    dashboard.create_layout()
 
 
 if __name__ == "__main__":
-    # For testing, run as desktop app
-    def main(page: ft.Page):
-        dashboard = AdvancedDashboard(page)
-    
     ft.app(target=main)

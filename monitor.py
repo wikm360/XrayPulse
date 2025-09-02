@@ -470,17 +470,17 @@ class MonitorController:
             self.stop()
     
     def start_web_interface(self):
-        """Start the web interface in a separate process"""
-        import multiprocessing
-        from web_interface import run_web_server
-        
-        self.web_server = multiprocessing.Process(
-            target=run_web_server,
-            args=("127.0.0.1", 7070),
-            daemon=True
+        """Start the web interface using 'flet run' command in a separate process"""
+        import subprocess
+        import sys
+
+        # Start the process
+        self.web_server = subprocess.Popen(
+            ["flet", "run", "-w", "-p", "7070", "web_interface.py"]
         )
-        self.web_server.start()
+        
         print(f"Web interface available at: http://127.0.0.1:7070")
+        print(f"Flet web server started with PID: {self.web_server.pid}")
     
     def stop(self):
         """Stop all components"""
