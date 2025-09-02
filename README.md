@@ -1,4 +1,22 @@
-# Xray Config Monitor - Installation Guide
+# XrayPulse - Xray Config Monitor
+
+## Project Structure
+```
+XrayPulse/
+├── monitor.py           # Main monitoring application
+├── web_interface.py      # Web interface
+├── convert.py           # Config converter (from existing project)
+├── configs/             # Stores converted configs (auto-created)
+├── ping_results.json    # Test results (auto-created)
+├── monitor.log         # Application logs (auto-created)
+└── core/               # Xray binaries
+    ├── win/
+    │   └── xray.exe
+    ├── linux/
+    │   └── xray
+    └── macos/
+        └── xray
+```
 
 ## 📋 Requirements
 
@@ -15,36 +33,10 @@ Ensure you have Xray binary installed in:
 
 ## 🚀 Installation Steps
 
-### 1. Clone or Create Project Structure
+### 1. Clone Project
 ```bash
-mkdir XrayPulse
+git clone https://github.com/wikm360/XrayPulse.git
 cd XrayPulse
-```
-
-### 2. Copy Required Files
-```bash
-# Copy the three main files
-- monitor.py (main application)
-- web_interface.py (web dashboard)
-- convert.py (link to json parser)
-```
-
-### 4. Create Directory Structure
-```
-XrayPulse/
-├── monitor.py           # Main monitoring application
-├── web_interface.py      # Web interface
-├── convert.py           # Config converter (from existing project)
-├── configs/             # Stores converted configs (auto-created)
-├── ping_results.json    # Test results (auto-created)
-├── monitor.log         # Application logs (auto-created)
-└── core/               # Xray binaries
-    ├── win/
-    │   └── xray.exe
-    ├── linux/
-    │   └── xray
-    └── macos/
-        └── xray
 ```
 
 ## 🎯 Usage
@@ -94,10 +86,9 @@ self.tester.start(interval=300)
 #### Change Web Port
 In `monitor.py`, modify the web server port:
 ```python
-self.web_server = multiprocessing.Process(
-    target=run_web_server,
-    args=("127.0.0.1", 7070),  # Change 7070 to desired port
-    daemon=True
+  self.web_server = subprocess.Popen(
+      ["flet", "run", "-w", "-p", "7070", "web_interface.py"]
+  ) # Change 7070 to desired port
 )
 ```
 
