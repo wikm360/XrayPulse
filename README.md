@@ -2,9 +2,9 @@
 
 ## Project Screenshots
 
-![pc Page](ScreenShots/1.png)
+![pc Page](ScreenShot/1.png)
 
-![mobile Panel](ScreenShots/2.png)
+![mobile Panel](ScreenShot/2.png)
 
 ## Project Structure
 ```
